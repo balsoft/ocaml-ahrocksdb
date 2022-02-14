@@ -1,5 +1,5 @@
 module Ffi = Rocksdb_ffi.M
-module Rocksdb = Ffi.Rocksdb
+module Rocks = Ffi.Rocksdb
 
 module Options = Rocksdb_options
 
@@ -11,7 +11,7 @@ let msg s = Error (`Msg s)
 
 type db = {
   config: Options.config;
-  db: Rocksdb.db;
+  db: Rocks.db;
 }
 
 module Desc = struct
@@ -26,7 +26,7 @@ open W
 type t = W.t
 
 let close_db t =
-  match unwrap t (fun { db; _ } -> Ok (Rocksdb.close db)) with
+  match unwrap t (fun { db; _ } -> Ok (Rocks.close db)) with
   | Ok () ->
     t.valid <- false;
     Ok ()
@@ -41,28 +41,28 @@ let with_error_buffer fn =
 
 let open_db ~config ~name =
   let options = Options.of_config config in
-  match with_error_buffer @@ Rocksdb.open_ options name with
+  match with_error_buffer @@ Rocks.open_ options name with
   | Ok db ->
     let t = wrap { db; config; } in
-    Gc.finalise (fun t -> on_finalise t (fun { db; _ } -> Rocksdb.close db)) t;
+    Gc.finalise (fun t -> on_finalise t (fun { db; _ } -> Rocks.close db)) t;
     Ok t
   | Error e -> Error e
 
 let open_db_read_only ?fail_on_wal:(fail=false) ~config ~name =
   let options = Options.of_config config in
-  match with_error_buffer @@ Rocksdb.open_read_only options name fail with
+  match with_error_buffer @@ Rocks.open_read_only options name fail with
   | Ok db ->
     let t = wrap { db; config; } in
-    Gc.finalise (fun t -> on_finalise t (fun { db; _ } -> Rocksdb.close db)) t;
+    Gc.finalise (fun t -> on_finalise t (fun { db; _ } -> Rocks.close db)) t;
     Ok t
   | Error err -> Error err
 
 let open_db_with_ttl ~config ~name ~ttl =
   let options = Options.of_config config in
-  match with_error_buffer @@ Rocksdb.open_with_ttl options name ttl with
+  match with_error_buffer @@ Rocks.open_with_ttl options name ttl with
   | Ok db ->
     let t = wrap { db; config; } in
-    Gc.finalise (fun t -> on_finalise t (fun { db; _ } -> Rocksdb.close db)) t;
+    Gc.finalise (fun t -> on_finalise t (fun { db; _ } -> Rocks.close db)) t;
     Ok t
   | Error err -> Error err
 
@@ -70,20 +70,20 @@ let put db write_options ~key ~value =
   let key_len = String.length key in
   let value_len = String.length value in
   unwrap db @@ fun { db; _ } ->
-  Rocksdb.put db write_options (ocaml_string_start key) key_len (ocaml_string_start value) value_len
+  Rocks.put db write_options (ocaml_string_start key) key_len (ocaml_string_start value) value_len
   |> with_error_buffer
 
 let delete db write_options key =
   let key_len = String.length key in
   unwrap db @@ fun { db; _ } ->
-  Rocksdb.delete db write_options (ocaml_string_start key) key_len
+  Rocks.delete db write_options (ocaml_string_start key) key_len
   |> with_error_buffer
 
 let get db read_options key =
   let key_len = String.length key in
   let result_len = allocate Ffi.V.int_to_size_t 0 in
   let result = unwrap db @@ fun { db; _ }  ->
-    with_error_buffer @@ Rocksdb.get db read_options (ocaml_string_start key) key_len result_len
+    with_error_buffer @@ Rocks.get db read_options (ocaml_string_start key) key_len result_len
   in
   match result with
   | Error err -> Error err
@@ -92,25 +92,25 @@ let get db read_options key =
     | true -> Ok `Not_found
     | false ->
       let result = string_from_ptr result_ptr ~length:(!@ result_len) in
-      Gc.finalise (fun result_ptr -> Rocksdb.free (to_voidp result_ptr)) result_ptr;
+      Gc.finalise (fun result_ptr -> Rocks.free (to_voidp result_ptr)) result_ptr;
       Ok (`Found result)
 
 let flush db flush_options =
   unwrap db @@ fun { db; _ } ->
-  Rocksdb.flush db flush_options
+  Rocks.flush db flush_options
   |> with_error_buffer
 
 let compact_now db =
   unwrap db @@ fun { db; _ } ->
-  Ok (Rocksdb.compact_range db None 0 None 0)
+  Ok (Rocks.compact_range db None 0 None 0)
 
 let stats db =
   unwrap  db @@ fun { db;  _ } ->
-  match Rocksdb.property_value db "rocksdb.stats" with
+  match Rocks.property_value db "rocksdb.stats" with
   | None -> Ok None
   | Some stats ->
     let string = coerce (ptr char) string stats in
-    Gc.finalise (fun stats -> Rocksdb.free (to_voidp stats)) stats;
+    Gc.finalise (fun stats -> Rocks.free (to_voidp stats)) stats;
     Ok (Some string)
 
 let get_cache_usage db =
@@ -121,7 +121,7 @@ let get_cache_usage db =
 
 module Batch = struct
 
-  open Rocksdb
+  open Rocks
 
   type batch = Batch.t
 
@@ -141,7 +141,7 @@ module Batch = struct
 
   let write db write_options batch =
     unwrap db @@ fun { db;  _ } ->
-    Rocksdb.write db write_options batch |> with_error_buffer
+    Rocks.write db write_options batch |> with_error_buffer
 
   let simple_write_batch db write_options elts =
     let batch = create () in
@@ -152,7 +152,7 @@ end
 
 module Iterator = struct
 
-  open Rocksdb
+  open Rocks
 
   type iterator = Iterator.t
 

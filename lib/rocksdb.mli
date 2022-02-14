@@ -10,6 +10,8 @@ no function is left never called and untested.
 
 type error = [ `Msg of string ]
 
+module Ffi = Rocksdb_ffi.M
+module Rocks = Ffi.Rocksdb
 
 module Options : sig
 

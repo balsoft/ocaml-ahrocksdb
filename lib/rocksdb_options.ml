@@ -1,5 +1,5 @@
 module Ffi = Rocksdb_ffi.M
-module Rocksdb = Ffi.Rocksdb
+module Rocks = Ffi.Rocksdb
 
 open Ffi.Options
 
